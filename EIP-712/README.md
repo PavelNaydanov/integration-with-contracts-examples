@@ -60,6 +60,41 @@ npx hardhat test
     }
 ```
 
+По мимо восстановления подписи на смарт-контракте посмотрим на обратную сторону ts кода, который показывает, как формируется подпись на клиенте при помощи библиотеки viem. У нас за работу фронтенда отвечают тесты.
+
+Код ниже показывает формирование подписи на клиенте.
+```ts
+const signature = await userWallet.signTypedData({
+    // Домен согласно спецификации
+    domain: {
+        name: 'EIP-712 based on OZ',
+        version: '1',
+        chainId: 31337n,
+        verifyingContract: checker.address,
+    },
+    // Типы передаваемых данных, для того, чтобы под капотом значения закодировались в правильные solidity типы
+    types: {
+        Order : [
+            {name: 'operator', type: 'address'},
+            {name: 'token', type: 'address'},
+            {name: 'amount', type: 'uint256'},
+            {name: 'nonce', type: 'uint256'},
+        ]
+    },
+    // Структура данных подписи с которой начнется кодирование
+    primaryType: 'Order',
+    // Данные для кодирования согласно описанным типам
+    message: {
+        operator: operatorWallet.account.address,
+        token: token.address,
+        amount: amount,
+        nonce: lastNonce + BigInt(1)
+    }
+});
+```
+
+_Важно!_ PrimaryType не описывается практически нигде, но компилятор тайпскрипта будет ругаться, если это поле не указано. Необходимо оно только на клиенте при кодировании полей, так как данные подписи могут быть вложенными друг в друга, алгоритму кодирования нужно явно указывать с какого типа (структуры) начинать кодирование.
+
 - Смарт-контракт - [CheckerWithOZ.sol](./contracts/CheckerWithOZ.sol)
 - Тест - [CheckerWithOZ.test.ts](./test/CheckerWithOZ.test.ts)
 
