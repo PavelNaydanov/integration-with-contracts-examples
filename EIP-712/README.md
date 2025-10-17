@@ -180,3 +180,68 @@ function checkSignature(SigArgs calldata args) public view returns (bool) {
 
 - Смарт-контракт [ArrayChecker.sol](./contracts/ArrayChecker.sol)
 - Тест - [ArrayChecker.test.ts](./test/ArrayChecker.test.ts)
+
+## Когда все плохо
+
+Ты уже используешь подход, когда обязательно тестируешь реализацию проверки подписи js кодом. Я это делаю следующим образом:
+  - Создаю новую ветку в проекте
+  - Накатываю туда hardhat (я пишу на Foundry, поэтому hardhat просто ставлю рядом)
+  - Пишу тест под hardhat, который проверит подпись.
+
+Если тест проходит, то все ок! Можно расслабиться. Hardhat у меня не пойдет в main ветку. Этот код можно удалить или сохранить и дать фронтендеру, который будет интегрировать твой смарт-контракт. Ему наглядно будет видно, как формировать подпись.
+
+Однако у меня еще ни разу не получилось без проблем оттестировать подпись. И это сложно. Я дошел до того, что можно отдельно смотреть и сравнивать хеши: домена, части данных, всех данных на контракте и в тесте js.
+
+На контракте это легко. В тестах я использую магию ethers  **TypedDataEncoder** (у меня это пятая версия ethers, в новых версиях должно быть что-то подобное).
+
+```js
+const domain = {
+    name: "Domain name",
+    version: "1",
+    chainId: (await ethers.provider.getNetwork()).chainId,
+    verifyingContract: await checker.getAddress(),
+} as const;
+
+// Данные для подписи
+const order = {
+    tokenIn: await tokenA.getAddress(),
+    tokenOut: await tokenB.getAddress(),
+    amountIn: ethers.parseEther("1.0"),
+    minAmountOut: ethers.parseEther("0.9"),
+    referralFeeValue: BigInt(3000)
+};
+const nonce = ...;
+const operatorSignature = {
+    order: order,
+    user: user.address,
+    nonce: nonce
+};
+
+// Типы описывающие данные для подписи
+const types = {
+    OperatorSignature: [
+        { name: "order", type: "Order" },
+        { name: "user", type: "address" },
+        { name: "nonce", type: "uint256" },
+    ],
+    Order: [
+        { name: "tokenIn", type: "address" },
+        { name: "tokenOut", type: "address" },
+        { name: "amountIn", type: "uint256" },
+        { name: "minAmountOut", type: "uint256" },
+        { name: "referralFeeValue", type: "uint256" },
+    ],
+};
+
+// Проверка домена
+const domain = ethers.TypedDataEncoder.hashDomain(domain);
+console.log("JS Domain Separator:", domain);
+
+// Проверка части данных (одной вложенной структуры)
+const orderHash = ethers.TypedDataEncoder.hashStruct("Order", types, order);
+console.log("Js order hash: ", orderHash);
+
+// Проверка всех данных
+const typedDataHash = ethers.TypedDataEncoder.hash(domain, types, operatorSignature);
+console.log("Js final hash: ", typedDataHash);
+```
