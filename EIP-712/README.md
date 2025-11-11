@@ -237,6 +237,14 @@ const types = {
 const domain = ethers.TypedDataEncoder.hashDomain(domain);
 console.log("JS Domain Separator:", domain);
 
+// Проверка typehash, который генерируется на базе types. Именно его можно вставлять на смарт-контрактах. Можно проверять для вложенных структур, что порядок структур в typehash объявлен правильно
+const typeHashString = ethers.TypedDataEncoder.from(types).encodeType("Order");
+console.log("Js type hash string: ", typeHashString);
+
+// Проверка значения typeHash
+const typeHash = ethers.keccak256(ethers.toUtf8Bytes(typeHashString));
+console.log("orderTypeHash: ", typeHash);
+
 // Проверка части данных (одной вложенной структуры)
 const orderHash = ethers.TypedDataEncoder.hashStruct("Order", types, order);
 console.log("Js order hash: ", orderHash);
